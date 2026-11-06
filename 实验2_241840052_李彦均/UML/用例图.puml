@@ -1,0 +1,98 @@
+@startuml
+title 外卖点餐与配送系统 用例图
+left to right direction
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 12
+skinparam shadowing true
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam usecase {
+    BackgroundColor #FFFFFF
+    BorderColor #555555
+    ArrowColor #333333
+    FontColor #222222
+}
+skinparam rectangle {
+    BackgroundColor #FAFAFA
+    BorderColor #888888
+}
+actor "顾客" as Customer
+actor "商家" as Merchant
+actor "配送员" as Courier
+actor "管理员" as Admin
+actor "支付网关" as PayGateway <<外部系统>>
+actor "定时任务" as Scheduler <<系统>>
+rectangle "外卖点餐与配送系统" {
+    ' 通用
+    usecase "登录与切换角色" as UC_Login
+    ' 顾客
+    usecase "查询店铺与菜品" as UC_Search
+    usecase "管理购物车\n（支持多店铺）" as UC_Cart
+    usecase "提交订单" as UC_Submit
+    usecase "支付订单" as UC_Pay
+    usecase "取消订单" as UC_Cancel
+    usecase "查看配送进度" as UC_Track
+    usecase "确认收货" as UC_ConfirmReceipt
+    ' 商家
+    usecase "维护店铺信息" as UC_ShopInfo
+    usecase "管理菜品与库存" as UC_Dish
+    usecase "切换营业状态" as UC_ShopStatus
+    usecase "设置自动接单" as UC_AutoAccept
+    usecase "接单 / 拒单" as UC_Accept
+    usecase "登记出餐" as UC_Ready
+    ' 配送员
+    usecase "抢单" as UC_Grab
+    usecase "查看地址与联系方式" as UC_Address
+    usecase "上传送达证据" as UC_Evidence
+    usecase "确认送达" as UC_Delivered
+    ' 管理员
+    usecase "介入订单争议" as UC_Dispute
+    usecase "查看操作日志" as UC_Log
+    ' 系统自动任务
+    usecase "自动取消超时订单" as UC_AutoCancel
+    usecase "自动分配配送任务" as UC_AutoAssign
+    usecase "2 小时自动确认收货" as UC_AutoConfirm
+    ' 被包含的公共用例
+    usecase "锁定 / 扣减 / 释放库存" as UC_Stock
+    usecase "计算订单价格" as UC_Price
+    usecase "自动退款" as UC_Refund
+}
+' ============ 参与者与用例 ============
+Customer --> UC_Login
+Customer --> UC_Search
+Customer --> UC_Cart
+Customer --> UC_Submit
+Customer --> UC_Pay
+Customer --> UC_Cancel
+Customer --> UC_Track
+Customer --> UC_ConfirmReceipt
+Merchant --> UC_Login
+Merchant --> UC_ShopInfo
+Merchant --> UC_Dish
+Merchant --> UC_ShopStatus
+Merchant --> UC_AutoAccept
+Merchant --> UC_Accept
+Merchant --> UC_Ready
+Courier --> UC_Login
+Courier --> UC_Grab
+Courier --> UC_Address
+Courier --> UC_Evidence
+Courier --> UC_Delivered
+Admin --> UC_Login
+Admin --> UC_Dispute
+Admin --> UC_Log
+PayGateway --> UC_Pay
+PayGateway --> UC_Refund
+Scheduler --> UC_AutoCancel
+Scheduler --> UC_AutoAssign
+Scheduler --> UC_AutoConfirm
+' ============ 用例之间的包含/扩展关系 ============
+UC_Submit ..> UC_Stock : <<include>>
+UC_Submit ..> UC_Price : <<include>>
+UC_Pay ..> UC_Stock : <<include>>
+UC_Cancel ..> UC_Stock : <<include>>
+UC_Cancel ..> UC_Refund : <<include>>
+UC_AutoCancel ..> UC_Stock : <<include>>
+UC_AutoCancel ..> UC_Refund : <<include>>
+UC_Accept ..> UC_Refund : <<include>>
+@enduml

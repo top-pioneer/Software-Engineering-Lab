@@ -1,0 +1,272 @@
+@startuml
+title 外卖点餐与配送系统 核心领域类图
+left to right direction
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 12
+skinparam shadowing true
+skinparam nodesep 40
+skinparam ranksep 55
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+skinparam class {
+    BackgroundColor White
+    BorderColor #555555
+    ArrowColor #333333
+    FontColor #222222
+}
+skinparam package {
+    BackgroundColor #FAFAFA
+    BorderColor #888888
+    FontColor #333333
+}
+
+' ============ 用户与权限模块 ============
+package "用户与权限模块" as PUser {
+    class User {
+        - userId : String
+        - account : String
+        - phone : String
+        - currentRole : Role
+        + login() : void
+        + switchRole(role : Role) : void
+        + hasPermission(code : String) : boolean
+    }
+    enum Role {
+        CUSTOMER
+        MERCHANT
+        COURIER
+        ADMIN
+    }
+    class Permission {
+        - code : String
+        + check() : boolean
+    }
+}
+
+' ============ 店铺与菜品模块 ============
+package "店铺与菜品模块" as PShop {
+    class Shop {
+        - shopId : String
+        - name : String
+        - address : String
+        - businessHours : String
+        - status : ShopStatus
+        + updateInfo() : void
+        + isOrderable() : boolean
+    }
+    enum ShopStatus {
+        OPEN
+        RESTING
+        SUSPENDED
+        CLOSED
+    }
+    class Category {
+        - categoryId : String
+        - name : String
+    }
+    class Dish {
+        - dishId : String
+        - name : String
+        - price : Decimal
+        - image : String
+        - status : DishStatus
+        + changeStatus(status : DishStatus) : void
+        + isAvailable() : boolean
+    }
+    enum DishStatus {
+        ON_SALE
+        OFF_SHELF
+        SOLD_OUT
+    }
+}
+
+' ============ 查询与购物车模块 ============
+package "查询与购物车模块" as PCart {
+    class Cart {
+        - cartId : String
+        + addItem(dish : Dish, quantity : Integer) : void
+        + removeItem(item : CartItem) : void
+        + splitByShop() : Order[]
+        + containsInvalidItem() : boolean
+    }
+    class CartItem {
+        - quantity : Integer
+        - snapshotPrice : Decimal
+        - invalid : boolean
+        - changeNotice : String
+        + markInvalid(notice : String) : void
+    }
+}
+
+' ============ 订单模块 ============
+package "订单模块" as POrder {
+    class Order {
+        - orderId : String
+        - totalAmount : Decimal
+        - status : OrderStatus
+        - deliveryType : DeliveryType
+        - contactPhone : String
+        - note : String
+        - createdAt : DateTime
+        + canCancel() : boolean
+        + changeStatus(to : OrderStatus) : void
+        + cancel() : void
+    }
+    class OrderItem {
+        - quantity : Integer
+        - unitPrice : Decimal
+        - dishNameSnapshot : String
+    }
+    class PriceBreakdown {
+        - dishAmount : Decimal
+        - packagingFee : Decimal
+        - deliveryFee : Decimal
+        - discount : Decimal
+        - total : Decimal
+        + calculate() : Decimal
+    }
+    class Address {
+        - detail : String
+        - contactName : String
+        - phone : String
+    }
+    enum OrderStatus {
+        CREATED
+        PAID
+        ACCEPTED
+        DELIVERING
+        DELIVERED
+        COMPLETED
+        CANCELLED
+        REJECTED
+        REFUNDED
+        DELIVERY_FAILED
+    }
+    enum DeliveryType {
+        DELIVERY
+        PICKUP
+    }
+}
+
+' ============ 库存模块 ============
+package "库存模块" as PInventory {
+    class Inventory {
+        - available : Integer
+        - locked : Integer
+        - restoreAt : DateTime
+        + lock(quantity : Integer) : boolean
+        + release(quantity : Integer) : void
+        + deduct(quantity : Integer) : void
+    }
+}
+
+' ============ 支付与退款模块 ============
+package "支付与退款模块" as PPay {
+    class Payment {
+        - paymentId : String
+        - amount : Decimal
+        - status : PaymentStatus
+        - channel : String
+        - idempotencyKey : String
+        + pay() : void
+        + queryResult() : PaymentStatus
+    }
+    enum PaymentStatus {
+        PENDING
+        SUCCESS
+        FAILED
+        TIMEOUT
+        DUPLICATED
+    }
+    class Refund {
+        - refundId : String
+        - amount : Decimal
+        - reason : String
+        + execute() : void
+    }
+}
+
+' ============ 配送模块 ============
+package "配送模块" as PDelivery {
+    class DeliveryTask {
+        - taskId : String
+        - status : DeliveryStatus
+        - assignedAt : DateTime
+        + grab(courier : User) : boolean
+        + assign(courier : User) : void
+        + confirmDelivered() : void
+    }
+    enum DeliveryStatus {
+        PENDING_ASSIGN
+        GRABBED
+        PICKED_UP
+        DELIVERED
+        FAILED
+    }
+    class DeliveryEvidence {
+        - evidenceId : String
+        - imageUrl : String
+        - createdAt : DateTime
+    }
+    class CourierProfile {
+        - maxOrders : Integer
+        - activeOrders : Integer
+        + canAccept() : boolean
+    }
+}
+
+' ============ 运营与日志模块 ============
+package "运营与日志模块" as PAdmin {
+    class OperationLog {
+        - logId : String
+        - action : String
+        - reason : String
+        - createdAt : DateTime
+        + record() : void
+    }
+    class Dispute {
+        - disputeId : String
+        - type : String
+        - status : String
+    }
+    class TransactionRecord {
+        - recordId : String
+        - recordType : String
+        - deletable : Boolean
+        - archivedAt : DateTime
+        + archive() : void
+    }
+}
+
+' ============ 模块内与模块间关系 ============
+User "1" -- "1..*" Role : 具备 >
+Role "1" o-- "0..*" Permission : 授予 >
+User "1" -- "0..1" Cart : 持有 >
+User "1" -- "0..1" CourierProfile : 配送身份 >
+
+Shop "1" *-- "0..*" Category : 分类 >
+Shop "1" *-- "0..*" Dish : 包含 >
+Category "1" o-- "0..*" Dish : 归类 >
+Dish "1" *-- "1" Inventory : 对应 >
+
+Cart "1" *-- "0..*" CartItem : 包含 >
+CartItem "*" --> "1" Dish : 引用 >
+Cart ..> Order : 按店铺拆单生成 >
+
+Order "1" *-- "1..*" OrderItem : 包含 >
+Order "1" *-- "1" PriceBreakdown : 价格组成 >
+OrderItem "*" --> "1" Dish : 价格快照 >
+Order "*" --> "1" Shop : 所属店铺 >
+Order "1" --> "0..1" Address : 收货地址 >
+Order "1" -- "0..*" Payment : 支付记录 >
+Payment "1" -- "0..1" Refund : 发生退款 >
+Order "1" -- "0..1" DeliveryTask : 派发配送 >
+DeliveryTask "*" --> "1" User : 配送员 >
+DeliveryTask "1" *-- "0..*" DeliveryEvidence : 留存证据 >
+
+OperationLog "*" --> "1" User : 操作人 >
+OperationLog "*" --> "0..1" Order : 关联订单 >
+TransactionRecord "*" --> "1" Order : 交易留痕 >
+Dispute "*" --> "1" Order : 针对订单 >
+
+@enduml

@@ -1,0 +1,94 @@
+@startuml
+title 外卖点餐与配送系统 活动图
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 12
+skinparam shadowing true
+skinparam activity {
+    BackgroundColor #FFFFFF
+    BorderColor #555555
+    ArrowColor #333333
+    FontColor #222222
+}
+skinparam swimlane {
+    BorderColor #888888
+    TitleBackgroundColor #EEEEEE
+    TitleFontColor #222222
+}
+|顾客|
+start
+:查询店铺与菜品;
+:加入购物车（可跨店铺）;
+:提交订单;
+|系统|
+:校验店铺营业状态、菜品状态与库存;
+if (校验通过?) then (否)
+  :提示不可下单原因;
+  stop
+else (是)
+endif
+:锁定库存;
+if (短时间提交相同订单?) then (是)
+  :弹出“检测到购买两次，\n是否确有重复购买需求”提示;
+  if (顾客确认继续?) then (否)
+    :取消提交并释放库存;
+    stop
+  else (是)
+    :继续提交;
+  endif
+else (否)
+  :继续提交;
+endif
+:按店铺拆单并计算价格;
+:创建待支付订单;
+|顾客|
+:选择支付方式并支付;
+|支付服务|
+:接收支付结果;
+if (支付成功?) then (是)
+  :扣减库存并记录支付;
+  |商家|
+  :接收订单;
+  if (商家接单?) then (是)
+    :制作并登记出餐;
+    |系统|
+    :发布配送任务到订单大厅;
+    if (配送员抢单?) then (是)
+      |配送员|
+      :抢单成功;
+    else (抢单超时)
+      |系统|
+      :按配送员负载自动分配;
+      |配送员|
+      :接收配送任务;
+    endif
+    |配送员|
+    :取餐并配送;
+    if (可正常送达?) then (否)
+      :放置指定地点并拍照上传;
+    else (是)
+    endif
+    :确认送达;
+    |顾客|
+    if (2 小时内确认收货?) then (是)
+      :确认收货;
+    else (否)
+      |系统|
+      :系统自动确认收货;
+    endif
+    |系统|
+    :订单完成，同步库存/支付/配送数据;
+    stop
+  else (拒单或接单超时)
+    |系统|
+    :自动退款并记录退款;
+    :缓冲期结束后恢复库存;
+    :订单关闭;
+    stop
+  endif
+else (失败或超时)
+  |系统|
+  :提示重新支付或取消订单;
+  :释放锁定库存;
+  stop
+endif
+@enduml

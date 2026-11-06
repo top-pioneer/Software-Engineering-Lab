@@ -1,0 +1,58 @@
+@startuml
+title 外卖点餐与配送系统 状态图
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 12
+skinparam shadowing true
+skinparam state {
+    BackgroundColor White
+    BorderColor #555555
+    ArrowColor #333333
+    FontColor #222222
+}
+hide empty description
+state "待支付\nCREATED" as Created
+state "已支付\nPAID" as Paid
+state "已接单\nACCEPTED" as Accepted
+state "配送中\nDELIVERING" as Delivering
+state "已送达\nDELIVERED" as Delivered
+state "已完成\nCOMPLETED" as Completed
+state "已取消\nCANCELLED" as Cancelled
+state "已拒单\nREJECTED" as Rejected
+state "已退款\nREFUNDED" as Refunded
+state "配送失败\nDELIVERY_FAILED" as DeliveryFailed
+[*] --> Created : 提交订单
+Created --> Paid : 支付成功
+Created --> Cancelled : 15 分钟内取消\n/ 支付超时
+Paid --> Accepted : 商家接单
+Paid --> Rejected : 商家拒单（填写说明）
+Paid --> Cancelled : 接单超时自动取消\n/ 扣除信誉分
+Accepted --> Delivering : 登记出餐并分配配送员
+Delivering --> Delivered : 配送员确认送达
+Delivering --> DeliveryFailed : 无法联系顾客\n/ 拍照留证
+Delivered --> Completed : 顾客确认\n/ 2 小时自动确认
+Rejected --> Refunded : 自动退款
+Cancelled --> Refunded : 已支付金额原路退回
+Cancelled --> [*] : 未支付关闭
+DeliveryFailed --> Refunded : 管理员审核后退款\n（规则待确认）
+Completed --> [*]
+Refunded --> [*]
+note top of Paid
+  支付成功后才允许进入
+  商家接单流程（REQ-016）。
+end note
+note right of Completed
+  已完成订单不可取消；
+  出现问题只能向平台申诉（REQ-025）。
+end note
+note left of Cancelled
+  已取消订单不能再次接单（REQ-025）。
+end note
+note bottom of Delivered
+  配送员确认送达后 2 小时，
+  顾客未确认则系统自动确认（REQ-021）。
+end note
+note bottom of DeliveryFailed
+  配送失败属于订单主状态；
+  后续处理由管理员介入审核（REQ-020/022）。
+end note
+@enduml

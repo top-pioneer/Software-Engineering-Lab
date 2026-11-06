@@ -1,0 +1,85 @@
+@startuml
+title 外卖点餐与配送系统 时序图
+autonumber
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 12
+skinparam shadowing true
+skinparam sequenceMessageAlign left
+skinparam participant {
+    BackgroundColor #FFFFFF
+    BorderColor #555555
+    FontColor #222222
+}
+skinparam actor {
+    BackgroundColor #FFFFFF
+    BorderColor #555555
+    FontColor #222222
+}
+actor 顾客 as Customer
+participant "顾客端" as App
+participant "订单服务" as OrderSvc
+participant "库存服务" as InvSvc
+participant "支付服务" as PaySvc
+participant "支付网关" as Gateway
+participant "商家端" as MerchantApp
+participant "配送调度服务" as DeliverySvc
+participant "配送员端" as CourierApp
+participant "通知服务" as Notify
+== 阶段一：提交订单与库存检查 ==
+Customer -> App : 选择菜品并提交订单
+App -> OrderSvc : submit(cart, address, deliveryType)
+OrderSvc -> OrderSvc : 校验营业状态/菜品状态\n检查重复下单
+OrderSvc -> InvSvc : lock(orderItems)
+alt 库存不足或菜品售罄
+    InvSvc --> OrderSvc : 锁定失败
+    OrderSvc --> App : 返回缺货/售罄提示
+    App --> Customer : 提示调整购物车
+else 锁定成功
+    InvSvc --> OrderSvc : 锁定成功
+    OrderSvc -> OrderSvc : 按店铺拆单并计算价格
+    OrderSvc --> App : 订单号 + 待支付金额
+end
+== 阶段二：支付与库存反馈 ==
+Customer -> App : 选择支付方式并支付
+App -> PaySvc : pay(orderId, channel)
+PaySvc -> Gateway : 发起支付
+alt 支付成功
+    Gateway --> PaySvc : 支付成功回调
+    PaySvc -> PaySvc : 幂等校验并记录支付
+    PaySvc -> InvSvc : deduct(orderItems)
+    PaySvc -> OrderSvc : markPaid(orderId)
+    OrderSvc -> Notify : 推送新订单事件
+    Notify -> MerchantApp : 新订单提醒
+else 支付失败
+    Gateway --> PaySvc : 支付失败
+    PaySvc --> App : 提示重新支付
+    App --> Customer : 展示重试入口
+else 支付超时
+    PaySvc -> OrderSvc : 取消订单
+    OrderSvc -> InvSvc : release(orderItems)
+    OrderSvc -> Notify : 通知顾客订单取消
+end
+== 阶段三：商家接单与配送 ==
+alt 商家拒单
+    MerchantApp -> OrderSvc : reject(orderId, reason)
+    OrderSvc -> PaySvc : refund(order)
+    PaySvc -> Gateway : 原路退款
+    OrderSvc -> InvSvc : scheduleRestore(orderItems)
+    OrderSvc -> Notify : 通知顾客并关闭订单
+else 接单成功
+    MerchantApp -> OrderSvc : accept(orderId)
+    OrderSvc -> DeliverySvc : createTask(order)
+    DeliverySvc -> Notify : 发布到订单大厅
+    Notify -> CourierApp : 抢单提醒
+    CourierApp -> DeliverySvc : grabTask(taskId)
+    DeliverySvc -> DeliverySvc : 校验最大接单数
+    DeliverySvc --> CourierApp : 抢单成功
+    CourierApp -> DeliverySvc : confirmDelivered(image)
+    DeliverySvc -> OrderSvc : markDelivered(orderId)
+    OrderSvc -> Notify : 通知顾客确认收货
+    Customer -> App : 确认收货
+    App -> OrderSvc : confirmReceipt(orderId)
+    OrderSvc -> OrderSvc : 状态机校验并完成订单
+    OrderSvc -> Notify : 订单完成事件
+end
+@enduml

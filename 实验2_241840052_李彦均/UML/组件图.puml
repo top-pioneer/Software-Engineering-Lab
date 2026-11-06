@@ -1,0 +1,88 @@
+@startuml
+title 外卖点餐与配送系统 组件图
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 12
+skinparam shadowing true
+skinparam componentStyle rectangle
+skinparam nodesep 40
+skinparam ranksep 55
+skinparam packageStyle rectangle
+skinparam component {
+    BackgroundColor #FFFFFF
+    BorderColor #555555
+    ArrowColor #333333
+    FontColor #222222
+}
+skinparam package {
+    BackgroundColor #F7F7F7
+    BorderColor #888888
+    FontColor #333333
+}
+package "表现层" as ViewLayer {
+    [顾客端\n浏览 / 购物车 / 下单 / 支付] as CustomerApp
+    [商家端\n店铺菜品 / 接单 / 出餐] as MerchantApp
+    [配送员端\n抢单 / 配送 / 留证] as CourierApp
+    [管理端\n争议介入 / 日志审计] as AdminApp
+}
+package "业务服务层（按业务能力划分）" as ServiceLayer {
+    [用户与权限服务] as AuthSvc
+    [店铺与菜品服务] as ShopSvc
+    [查询与购物车服务] as CartSvc
+    [订单服务] as OrderSvc
+    [库存服务] as InventorySvc
+    [支付与退款服务] as PaySvc
+    [配送调度服务] as DeliverySvc
+    [运营管理服务] as AdminSvc
+    [通知服务] as NotifySvc
+}
+package "基础设施层" as InfraLayer {
+    database "业务数据库" as DB
+    [缓存] as Cache
+    queue "消息队列" as MQ
+    [对象存储] as OSS
+}
+cloud "第三方支付网关" as PayGateway
+cloud "地图 / 定位服务" as MapSvc
+' ============ 表现层 -> 业务服务 ============
+CustomerApp --> AuthSvc : 登录/鉴权
+CustomerApp --> CartSvc : 查询/加购
+CustomerApp --> OrderSvc : 下单/取消/确认
+CustomerApp --> PaySvc : 支付
+MerchantApp --> AuthSvc : 登录/鉴权
+MerchantApp --> ShopSvc : 维护店铺与菜品
+MerchantApp --> OrderSvc : 接单/拒单/出餐
+CourierApp --> AuthSvc : 登录/鉴权
+CourierApp --> DeliverySvc : 抢单/送达/留证
+AdminApp --> AuthSvc : 登录/鉴权
+AdminApp --> AdminSvc : 争议介入/日志审计
+' ============ 核心业务交互 ============
+CartSvc --> ShopSvc : 查询店铺与菜品
+CartSvc --> InventorySvc : 校验可售数量
+OrderSvc --> CartSvc : 购物车拆单
+OrderSvc --> InventorySvc : 锁定/扣减/释放
+OrderSvc --> PaySvc : 发起支付/退款
+OrderSvc --> DeliverySvc : 创建配送任务
+OrderSvc --> NotifySvc : 订单状态通知
+PaySvc --> PayGateway : 支付/退款
+PaySvc --> OrderSvc : 支付结果回写
+DeliverySvc --> MapSvc : 地址/距离
+DeliverySvc --> OSS : 送达证据
+DeliverySvc --> NotifySvc : 抢单提醒
+ShopSvc --> OSS : 菜品图片
+AdminSvc --> OrderSvc : 查询/纠正
+AdminSvc --> PaySvc : 退款核查
+AuthSvc --> Cache : 会话/权限缓存
+NotifySvc --> MQ : 异步推送
+OrderSvc --> MQ : 状态事件
+InventorySvc --> MQ : 延迟恢复库存
+' ============ 数据持久化 ============
+ServiceLayer ..> DB : 统一数据持久化
+' ============ 分层布局约束 ============
+CustomerApp -[hidden]-> AuthSvc
+MerchantApp -[hidden]-> ShopSvc
+CourierApp -[hidden]-> DeliverySvc
+AdminApp -[hidden]-> AdminSvc
+AuthSvc -[hidden]-> DB
+OrderSvc -[hidden]-> DB
+DeliverySvc -[hidden]-> DB
+@enduml
